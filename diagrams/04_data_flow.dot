@@ -1,0 +1,66 @@
+digraph SocGuardDFD {
+    graph [
+        label="SocGuard — Data Flow Diagram (Level 1)"
+        labelloc="t"
+        fontname="Helvetica-Bold"
+        fontsize=16
+        bgcolor="#0a0e17"
+        fontcolor="white"
+        pad=0.8
+        compound=true
+        rankdir=TB
+        splines=ortho
+    ]
+    node [fontname="Helvetica" fontsize=11 fontcolor="white"]
+    edge [fontname="Helvetica" fontsize=9 color="#2d3748" fontcolor="#94a3b8"]
+
+    // ─── External Entities ───
+    node [shape=box style="filled" fillcolor="#1a2133" color="#00f3ff"]
+    E1 [label="Telegram Platform"]
+    E2 [label="Bluesky Platform"]
+    E3 [label="Gmail Platform"]
+    ANALYST [label="SOC Analyst\n(Browser Client)"]
+
+    // ─── Processes ───
+    node [shape=ellipse style="filled" fillcolor="#1e3a5f" color="#00f3ff"]
+    P1 [label="P1: Ingest and Normalize\n(telegram/bluesky/email connectors\nand producer.py)"]
+    P2 [label="P2: Text Threat Analysis\n(BERT Toxicity + Phishing)"]
+    P3 [label="P3: Image Deepfake Analysis\n(ViT Fine-tuned + LIME XAI)"]
+    P4 [label="P4: Audio Deepfake Analysis\n(Heuristic keyword match)"]
+    P5 [label="P5: Metadata Bot Scoring\n(7-factor heuristic)"]
+    P6 [label="P6: Alert Persistence\n(PostgreSQL write + dedup)"]
+    P7 [label="P7: Backend API and WebSocket\n(FastAPI broadcast)"]
+    P8 [label="P8: Dashboard Render\n(Vanilla JS SPA)"]
+
+    // ─── Data Stores ───
+    node [shape=cylinder style="filled" fillcolor="#2d2a00" color="#ff9900" fontcolor="#ff9900"]
+    DS1 [label="DS1: Kafka Topic\nsocial-media-feed"]
+    DS2 [label="DS2: Kafka Topic\nprocessed_alerts"]
+    DS3 [label="DS3: PostgreSQL\nalerts table"]
+
+    // ─── Data Flows ───
+    E1 -> P1 [label="raw messages\n(text / photo / audio)"]
+    E2 -> P1 [label="posts and images"]
+    E3 -> P1 [label="emails and MIME attachments"]
+
+    P1 -> DS1 [label="normalized JSON event\n{content_id, platform, content_type,\ncontent, image_url, audio_url, ...}"]
+
+    DS1 -> P2 [label="all messages (text content)"]
+    DS1 -> P3 [label="messages where image_url is present"]
+    DS1 -> P4 [label="messages where audio_url is present"]
+    DS1 -> P5 [label="all messages (account metadata)"]
+
+    P2 -> DS2 [label="alert: {threat_category, severity, reasoning}"]
+    P3 -> DS2 [label="alert: {threat_category, explanation_image (LIME)}"]
+    P4 -> DS2 [label="alert: {threat_category, severity}"]
+    P5 -> DS2 [label="alert: {bot_score, reasons list}"]
+
+    DS2 -> P6 [label="full alert payload\n(auto.offset.reset = earliest)"]
+    P6 -> DS3 [label="INSERT INTO alerts\n(dedup on content_id UNIQUE)"]
+
+    DS2 -> P7 [label="live alerts\n(auto.offset.reset = latest)"]
+    DS3 -> P7 [label="SELECT * FROM alerts\n(REST /api/alerts and /api/stats)"]
+
+    P7 -> P8 [label="HTTP JSON response\n+ WebSocket push events"]
+    P8 -> ANALYST [label="HTML Dashboard\n(table, badges, modals, XAI viewer)"]
+}

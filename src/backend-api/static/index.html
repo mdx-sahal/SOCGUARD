@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOCGUARD | Threat Detection Dashboard</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <link rel="stylesheet" href="static/styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo"><i class="fa-solid fa-shield-halved"></i> SOCGUARD</div>
+            <nav>
+                <ul>
+                    <li id="nav-global" class="active"><a href="#" onclick="switchView('global'); return false;"><i
+                                class="fa-solid fa-earth-americas"></i> Global Feed</a></li>
+                    <li id="nav-telegram"><a href="#" onclick="switchView('telegram'); return false;"><i
+                                class="fa-brands fa-telegram"></i> Telegram <span id="badge-telegram"
+                                class="badge">0</span></a></li>
+                    <li id="nav-bluesky"><a href="#" onclick="switchView('bluesky'); return false;"><i
+                                class="fa-brands fa-bluesky"></i> Bluesky <span id="badge-bluesky"
+                                class="badge">0</span></a></li>
+                    <li id="nav-email"><a href="#" onclick="switchView('email'); return false;"><i
+                                class="fa-solid fa-envelope"></i> Email <span id="badge-email"
+                                class="badge">0</span></a></li>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="clear-logs-btn" class="clear-btn"><i class="fa-solid fa-trash"></i> Clear Logs</button>
+                <button id="logout-btn" class="clear-btn"
+                    style="background-color: var(--bg-hover); margin-top: 10px;"><i
+                        class="fa-solid fa-right-from-bracket"></i> Logout</button>
+                <br>
+                <p>v1.1.0 Alpha (Multi-View)</p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="system-status"><span class="status-label">SYSTEM:</span> <span
+                        class="status-value online">ONLINE</span></div>
+                <div class="connection-status"><span class="status-label">LIVE CONNECTION:</span> <span id="ws-status"
+                        class="status-value inactive">INACTIVE</span></div>
+            </header>
+
+            <section class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fa-solid fa-bell"></i></div>
+                    <div class="stat-info">
+                        <h3>Total Alerts</h3>
+                        <p id="total-alerts">0</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon warning-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <div class="stat-info">
+                        <h3>High Severity</h3>
+                        <p id="high-severity">0</p>
+                    </div>
+                </div>
+
+            </section>
+
+            <section class="feed-section">
+                <h2 id="feed-title"><i class="fa-solid fa-satellite-dish"></i> Global Feed</h2>
+                <div class="table-container">
+                    <table class="threat-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Platform</th>
+                                <th>Type</th>
+                                <th>Score</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alert-list"></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Detail Modal -->
+    <div id="detail-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2 id="modal-title">Alert Details</h2>
+            <div class="modal-body">
+                <div class="modal-section">
+                    <h3><i class="fa-solid fa-circle-info"></i> Meta Data</h3>
+                    <p><strong>ID:</strong> <span id="modal-id"></span></p>
+                    <p><strong>Timestamp:</strong> <span id="modal-timestamp"></span></p>
+                    <p><strong>Platform:</strong> <span id="modal-platform"></span></p>
+                    <p><strong>Author:</strong> <span id="modal-author" style="color:var(--accent-blue)"></span></p>
+                    <p><strong>Severity:</strong> <span id="modal-severity"></span></p>
+                </div>
+                <div class="modal-section">
+                    <h3><i class="fa-solid fa-magnifying-glass"></i> Analysis</h3>
+                    <p id="modal-reasoning" class="reasoning-text"></p>
+                </div>
+                <div class="modal-section">
+                    <h3><i class="fa-solid fa-file-lines"></i> Original Content</h3>
+                    <div id="modal-content-preview" class="content-preview"></div>
+                </div>
+                <div class="modal-section" id="xai-section" style="display:none;">
+                    <h3><i class="fa-solid fa-wand-magic-sparkles"></i> AI Explanation</h3>
+                    <div id="modal-xai-preview" class="xai-preview"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="static/app.js"></script>
+</body>
+
+</html>

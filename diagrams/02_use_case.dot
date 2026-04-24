@@ -1,0 +1,92 @@
+digraph SocGuardUseCases {
+    graph [
+        label="SocGuard — Use Case Diagram"
+        labelloc="t"
+        fontname="Helvetica-Bold"
+        fontsize=16
+        bgcolor="#0a0e17"
+        fontcolor="white"
+        rankdir=LR
+        pad=0.5
+        splines=curved
+    ]
+    node [fontname="Helvetica" fontsize=11 fontcolor="white"]
+    edge [fontname="Helvetica" fontsize=9 fontcolor="#94a3b8" color="#2d3748"]
+
+    // ─── Actors ───
+    node [shape=plaintext style="" fontcolor="white"]
+    ANALYST  [label="SOC Analyst\n(Human)"]
+    SYSTEM   [label="System\n(Automated)"]
+    TELEGRAM [label="Telegram\nPlatform"]
+    BLUESKY  [label="Bluesky\nPlatform"]
+    EMAIL_P  [label="Email\n(Gmail)"]
+
+    // ─── Analyst Use Cases ───
+    node [shape=ellipse style="filled" fillcolor="#111625" color="#00f3ff" fontcolor="white"]
+    UC1  [label="Login to Dashboard"]
+    UC2  [label="View Alert Feed\n(Global / Per Platform)"]
+    UC3  [label="Inspect Alert Details"]
+    UC4  [label="View XAI Explanation\n(LIME Image Overlay)"]
+    UC5  [label="Clear Alert Logs"]
+    UC6  [label="Logout"]
+    UC7  [label="Monitor Live Threats\n(WebSocket)"]
+
+    // ─── System Use Cases ───
+    node [fillcolor="#111625" color="#00ff9d"]
+    UC8  [label="Ingest Social Media Posts\n(Telegram / Bluesky / Email)"]
+    UC9  [label="Publish to Kafka\n(social-media-feed)"]
+    UC10 [label="Detect Toxic / Hate Speech\n(BERT Text Model)"]
+    UC11 [label="Detect Phishing URLs\n(Phishing BERT Model)"]
+    UC12 [label="Detect Deepfake Images\n(ViT Fine-tuned)"]
+    UC13 [label="Generate LIME Explanation\n(Critical Deepfakes only)"]
+    UC14 [label="Detect Synthetic Audio\n(Heuristic Keyword Match)"]
+    UC15 [label="Score Bot Accounts\n(Metadata Heuristic)"]
+    UC16 [label="Persist Alert to PostgreSQL"]
+    UC17 [label="Broadcast Alert via WebSocket"]
+
+    // ─── Analyst -> Use Cases ───
+    ANALYST -> UC1
+    ANALYST -> UC2
+    ANALYST -> UC3
+    ANALYST -> UC4
+    ANALYST -> UC5
+    ANALYST -> UC6
+    ANALYST -> UC7
+
+    // ─── Include / Extend ───
+    UC3 -> UC4 [label="<<include>>" style=dashed]
+    UC9 -> UC10 [label="<<include>>" style=dashed]
+    UC12 -> UC13 [label="<<extend>>\n(score > 90)" style=dashed]
+
+    // ─── System -> Use Cases ───
+    SYSTEM -> UC8
+    SYSTEM -> UC9
+    SYSTEM -> UC10
+    SYSTEM -> UC11
+    SYSTEM -> UC12
+    SYSTEM -> UC13
+    SYSTEM -> UC14
+    SYSTEM -> UC15
+    SYSTEM -> UC16
+    SYSTEM -> UC17
+
+    // ─── Platform Actors ───
+    TELEGRAM -> UC8 [label="Messages / Photos / Audio"]
+    BLUESKY  -> UC8 [label="Posts / Media"]
+    EMAIL_P  -> UC8 [label="Emails / Attachments"]
+
+    // ─── Pipeline Flow ───
+    UC8  -> UC9
+    UC9  -> UC10
+    UC9  -> UC11
+    UC9  -> UC12
+    UC9  -> UC14
+    UC9  -> UC15
+    UC10 -> UC16
+    UC11 -> UC16
+    UC12 -> UC16
+    UC14 -> UC16
+    UC15 -> UC16
+    UC16 -> UC17
+    UC17 -> UC7
+}

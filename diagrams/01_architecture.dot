@@ -1,0 +1,136 @@
+digraph SocGuardArchitecture {
+    graph [
+        label="SocGuard — System Architecture\nMulti-Modal Social Threat Detection Platform"
+        labelloc="t"
+        fontname="Helvetica-Bold"
+        fontsize=18
+        bgcolor="#0a0e17"
+        fontcolor="white"
+        pad=0.5
+        compound=true
+        rankdir=LR
+        splines=ortho
+    ]
+    node [fontname="Helvetica" shape=box style="filled,rounded" fontcolor="white" fontsize=12]
+    edge [fontname="Helvetica" fontsize=10 fontcolor="#94a3b8" color="#2d3748"]
+
+    // ─── External Data Sources ───
+    subgraph cluster_sources {
+        label="External Data Sources"
+        fontcolor="#00f3ff"
+        color="#2d3748"
+        style="filled"
+        bgcolor="#111625"
+        node [fillcolor="#1a2133" color="#00f3ff"]
+
+        TELEGRAM  [label="Telegram\n(Bot API Long Poll)" shape=cylinder]
+        BLUESKY   [label="Bluesky\n(ATProto SDK, 15s poll)" shape=cylinder]
+        EMAIL     [label="Gmail\n(OAuth2 + API, 30s poll)" shape=cylinder]
+        YOUTUBE   [label="YouTube\n(Data API v3)\n[INACTIVE]" shape=cylinder color="#555" fillcolor="#1a1a1a" fontcolor="#555"]
+    }
+
+    // ─── Ingestion Service ───
+    subgraph cluster_ingestion {
+        label="Ingestion Service\n(ingestion-service)"
+        fontcolor="#00f3ff"
+        color="#00f3ff"
+        bgcolor="#111625"
+        style=filled
+
+        PRODUCER [label="producer.py\nasyncio Orchestrator\n(3 async threads)" fillcolor="#1e3a5f" color="#00f3ff"]
+        INGEST_LOG [label="Kafka Producer\nclient.id: ingestion-producer\nmessage.max.bytes=10MB" fillcolor="#1a2133" color="#00f3ff"]
+    }
+
+    // ─── Message Bus ───
+    subgraph cluster_kafka {
+        label="Apache Kafka (Confluent 7.5.0)\n+ Zookeeper + kafka-ui"
+        fontcolor="#ff9900"
+        color="#ff9900"
+        bgcolor="#111625"
+        style=filled
+
+        TOPIC_IN  [label="Topic:\nsocial-media-feed" shape=parallelogram fillcolor="#2d2a00" color="#ff9900" fontcolor="#ff9900"]
+        TOPIC_OUT [label="Topic:\nprocessed_alerts" shape=parallelogram fillcolor="#2d2a00" color="#ff9900" fontcolor="#ff9900"]
+    }
+
+    // ─── Analysis Services ───
+    subgraph cluster_analysis {
+        label="Analysis Pipeline (Consumers)"
+        fontcolor="#00ff9d"
+        color="#00ff9d"
+        bgcolor="#111625"
+        style=filled
+
+        TEXT_SVC [label="Text Analysis\nPrimary: martin-ha/toxic-comment-model\nSecondary: ealvaradob/bert-finetuned-phishing\nGroup: text-analysis-group-v5" fillcolor="#0d2a1a" color="#00ff9d"]
+        IMG_SVC  [label="Image Analysis\nFine-tuned ViT (REAL/FAKE)\ngoogle/vit-base-patch16-224\nXAI: LIME (severity>90)\nGroup: image-analysis-group" fillcolor="#0d2a1a" color="#00ff9d"]
+        AUD_SVC  [label="Audio Analysis\nwav2vec2-base-960h (loaded, unused)\nHeuristic keyword matching\nGroup: audio-analysis-group-v5" fillcolor="#2a1a00" color="#ff9900"]
+        META_SVC [label="Metadata Analysis\nHeuristic Bot Scoring\n(7 factors, 0-100 score)\nGroup: metadata-analysis-group-v2" fillcolor="#0d2a1a" color="#00ff9d"]
+    }
+
+    // ─── Persistence Layer ───
+    subgraph cluster_persist {
+        label="Alert Persistence Service"
+        fontcolor="#00f3ff"
+        color="#2d3748"
+        bgcolor="#111625"
+        style=filled
+
+        PERSIST [label="persistence.py\nKafka Consumer -> PostgreSQL\nDedup: content_id UNIQUE\nGroup: alert-persistence-group" fillcolor="#1a2133" color="#00f3ff"]
+    }
+
+    // ─── Database ───
+    subgraph cluster_db {
+        label="PostgreSQL 15\n(port 5435)"
+        fontcolor="#ff9900"
+        color="#ff9900"
+        bgcolor="#111625"
+        style=filled
+
+        DB [label="socguard_db\nL alerts table\n  (id, content_id, timestamp,\n   platform, threat_category,\n   severity_score, reasoning,\n   explanation_image, is_resolved)" shape=cylinder fillcolor="#2d2a00" color="#ff9900"]
+    }
+
+    // ─── Backend & Frontend ───
+    subgraph cluster_backend {
+        label="Backend API (FastAPI)\nPort 8000"
+        fontcolor="#00f3ff"
+        color="#00f3ff"
+        bgcolor="#111625"
+        style=filled
+
+        API [label="main.py\nGET /api/alerts\nGET /api/stats\nPOST /api/login\nDELETE /api/alerts\nWS /ws/live-threats\nKafka Consumer: latest offset" fillcolor="#1e3a5f" color="#00f3ff"]
+    }
+
+    subgraph cluster_frontend {
+        label="Frontend (Vanilla JS)\nServed as Static Files"
+        fontcolor="#00ff9d"
+        color="#00ff9d"
+        bgcolor="#111625"
+        style=filled
+
+        UI [label="index.html + app.js + styles.css\nLogin -> Auth Guard -> Dashboard\nWebSocket Live Feed\nAlert Table + Detail Modal\nXAI Image Viewer" fillcolor="#0d2a1a" color="#00ff9d"]
+    }
+
+    // ─── Edges ───
+    TELEGRAM -> PRODUCER [label="text/photo/audio\n(HTTP REST)"]
+    BLUESKY  -> PRODUCER [label="text/image\n(ATProto)"]
+    EMAIL    -> PRODUCER [label="text/image\n(Gmail API)"]
+    YOUTUBE  -> PRODUCER [label="[INACTIVE]" style=dashed color="#555"]
+
+    PRODUCER -> INGEST_LOG -> TOPIC_IN
+
+    TOPIC_IN -> TEXT_SVC [label="all messages"]
+    TOPIC_IN -> IMG_SVC  [label="image_url present"]
+    TOPIC_IN -> AUD_SVC  [label="audio_url present"]
+    TOPIC_IN -> META_SVC [label="all messages"]
+
+    TEXT_SVC -> TOPIC_OUT [label="processed_alerts"]
+    IMG_SVC  -> TOPIC_OUT
+    AUD_SVC  -> TOPIC_OUT
+    META_SVC -> TOPIC_OUT
+
+    TOPIC_OUT -> PERSIST  -> DB
+    TOPIC_OUT -> API      [label="WS broadcast\n(latest offset)"]
+
+    DB -> API [label="REST queries\n(SQLAlchemy)"]
+    API -> UI [label="HTTP + WebSocket"]
+}

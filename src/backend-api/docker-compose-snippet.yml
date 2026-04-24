@@ -1,0 +1,14 @@
+backend-api:
+  build: ./src/backend-api
+  container_name: backend-api
+  ports:
+    - "8000:8000"
+  environment:
+    - KAFKA_BROKER=kafka:29092
+    - DB_HOST=postgres
+    - DB_USER=socguard_user
+    - DB_PASS=socguard_pass
+    - DB_NAME=socguard_db
+  depends_on:
+    - kafka
+    - postgres

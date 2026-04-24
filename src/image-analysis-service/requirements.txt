@@ -1,0 +1,12 @@
+torch
+requests
+confluent-kafka
+Pillow
+lime
+scikit-image
+numpy
+matplotlib
+transformers
+accelerate
+datasets
+torchvision

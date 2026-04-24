@@ -1,0 +1,174 @@
+digraph SocGuardClasses {
+    graph [
+        label="SocGuard — Class Diagram"
+        labelloc="t"
+        fontname="Helvetica-Bold"
+        fontsize=16
+        bgcolor="#0a0e17"
+        fontcolor="white"
+        pad=0.8
+        rankdir=TB
+    ]
+    node [fontname="Courier" shape=record style="filled" fontcolor="white" fontsize=10]
+    edge [fontname="Helvetica" fontsize=9 fontcolor="#94a3b8" color="#2d3748"]
+
+    // ─── Data Models ───
+    Alert_Model [
+        label="{Alert (SQLAlchemy ORM) | \
+id : Integer PK | \
+content_id : String UNIQUE | \
+timestamp : DateTime | \
+platform : String | \
+threat_category : String | \
+severity_score : Float | \
+reasoning : Text | \
+original_url : Text | \
+audio_url : Text | \
+content_type : String | \
+original_text : Text | \
+explanation_image : Text | \
+author : String | \
+is_resolved : Boolean | \
+__repr__() : str}"
+        fillcolor="#1e3a5f"
+        color="#00f3ff"
+    ]
+
+    LoginRequest [
+        label="{LoginRequest (Pydantic) | \
+username : str | \
+password : str}"
+        fillcolor="#111625"
+        color="#00f3ff"
+    ]
+
+    AudioCNN [
+        label="{AudioCNN (torch.nn.Module) | \
+conv1 : Conv2d(1 to 16, kernel=3) | \
+pool : MaxPool2d(2,2) | \
+conv2 : Conv2d(16 to 32, kernel=3) | \
+adaptive_pool : AdaptiveAvgPool2d(4,4) | \
+fc1 : Linear(512 to 64) | \
+fc2 : Linear(64 to 2) | \
+forward(x: Tensor) : Tensor}"
+        fillcolor="#2d2a00"
+        color="#ff9900"
+    ]
+
+    // ─── Backend Classes ───
+    ConnectionManager [
+        label="{ConnectionManager | \
+active_connections : List[WebSocket] | \
+connect(ws: WebSocket) : async | \
+disconnect(ws: WebSocket) | \
+broadcast(msg: dict) : async}"
+        fillcolor="#1e3a5f"
+        color="#00f3ff"
+    ]
+
+    // ─── Connector Classes ───
+    TelegramConnector [
+        label="{TelegramConnector | \
+BOT_TOKEN : str | \
+BASE_URL : str | \
+session : requests.Session | \
+offset : int | \
+start_telegram_listener(callback) | \
+handle_photo(message) : str | \
+handle_audio(message) : str}"
+        fillcolor="#0d2a1a"
+        color="#00ff9d"
+    ]
+
+    BlueskyConnector [
+        label="{BlueskyConnector | \
+BSKY_USERNAME : str | \
+BSKY_PASSWORD : str | \
+POLL_INTERVAL : int | \
+seen_cids : set | \
+start_bluesky_listener(callback)}"
+        fillcolor="#0d2a1a"
+        color="#00ff9d"
+    ]
+
+    EmailConnector [
+        label="{EmailConnector | \
+CLIENT_ID : str | \
+CLIENT_SECRET : str | \
+REFRESH_TOKEN : str | \
+seen_message_ids : set | \
+get_gmail_service() : service | \
+start_email_listener(callback) | \
+decode_image_attachment(parts) : str}"
+        fillcolor="#0d2a1a"
+        color="#00ff9d"
+    ]
+
+    // ─── Analyzer Classes ───
+    TextAnalyzer [
+        label="{TextAnalyzer | \
+classifier : HF pipeline (BERT) | \
+phishing_classifier : HF pipeline | \
+THREAT_PATTERNS : dict | \
+load_secondary_model() | \
+analyze_text(text: str) : tuple | \
+main()}"
+        fillcolor="#0d2a1a"
+        color="#00ff9d"
+    ]
+
+    ImageAnalyzer [
+        label="{ImageAnalyzer | \
+pipe : HF pipeline (ViT fine-tuned) | \
+explainer : LimeImageExplainer | \
+lime_predict_wrapper(images: ndarray) : ndarray | \
+generate_explanation(img: PIL) : str | \
+analyze_image(url: str) : tuple | \
+main()}"
+        fillcolor="#0d2a1a"
+        color="#00ff9d"
+    ]
+
+    AudioAnalyzer [
+        label="{AudioAnalyzer | \
+classifier : HF pipeline (wav2vec2) | \
+SUSPICIOUS_KEYWORDS : list | \
+load_audio_model() | \
+main()}"
+        fillcolor="#2d2a00"
+        color="#ff9900"
+    ]
+
+    MetadataAnalyzer [
+        label="{MetadataAnalyzer | \
+(stateless module) | \
+calculate_bot_score(data: dict) : tuple[int, list] | \
+main()}"
+        fillcolor="#0d2a1a"
+        color="#00ff9d"
+    ]
+
+    PersistenceService [
+        label="{PersistenceService | \
+engine : SQLAlchemy Engine | \
+Session : sessionmaker | \
+wait_for_db() | \
+init_db() | \
+finalize_alert(data: dict) : dict | \
+process_message(msg: str, session) | \
+main()}"
+        fillcolor="#1e3a5f"
+        color="#00f3ff"
+    ]
+
+    // ─── Relationships ───
+    ConnectionManager   -> Alert_Model       [label="broadcasts to WebSocket clients" style=dashed]
+    PersistenceService  -> Alert_Model       [label="creates and persists"]
+    TelegramConnector   -> TextAnalyzer      [label="feeds via Kafka social-media-feed" style=dashed]
+    BlueskyConnector    -> ImageAnalyzer     [label="feeds via Kafka" style=dashed]
+    EmailConnector      -> ImageAnalyzer     [label="feeds via Kafka" style=dashed]
+    AudioAnalyzer       -> AudioCNN          [label="AudioCNN defined but NOT used" style=dotted color="#ff4444"]
+    ImageAnalyzer       -> Alert_Model       [label="produces alert payload" style=dashed]
+    TextAnalyzer        -> Alert_Model       [label="produces alert payload" style=dashed]
+    LoginRequest        -> ConnectionManager [label="session token grants WS access" style=dashed]
+}

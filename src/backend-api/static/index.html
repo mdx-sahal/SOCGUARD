@@ -115,9 +115,44 @@
                     <h3><i class="fa-solid fa-wand-magic-sparkles"></i> AI Explanation</h3>
                     <div id="modal-xai-preview" class="xai-preview"></div>
                 </div>
+
+                <!-- Analyst Feedback -->
+                <div class="modal-section" id="feedback-section">
+                    <h3><i class="fa-solid fa-comment-dots"></i> Analyst Feedback</h3>
+                    <p class="feedback-prompt">Does the AI flagging reason match the actual threat?</p>
+                    <div class="feedback-buttons">
+                        <button id="btn-confirm" class="feedback-btn confirm-btn" onclick="submitFeedback('confirm')">
+                            <i class="fa-solid fa-thumbs-up"></i> Confirm Threat
+                        </button>
+                        <button id="btn-dispute" class="feedback-btn dispute-btn" onclick="submitFeedback('dispute')">
+                            <i class="fa-solid fa-thumbs-down"></i> Dispute Flagging
+                        </button>
+                    </div>
+                    <div id="dispute-reason-panel" class="dispute-reason-panel" style="display:none;">
+                        <label for="dispute-reason-select">Reason for dispute:</label>
+                        <select id="dispute-reason-select" class="reason-select">
+                            <option value="">-- Select a reason --</option>
+                            <option value="false_positive">False Positive — Not actually a threat</option>
+                            <option value="wrong_category">Wrong Category — Misclassified threat type</option>
+                            <option value="low_severity">Overstated Severity — Score too high</option>
+                            <option value="context_missing">Missing Context — Needs human review</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <textarea id="dispute-notes" class="dispute-notes" placeholder="Optional: add a brief note..."></textarea>
+                        <button class="feedback-btn submit-dispute-btn" onclick="submitDisputeReason()">
+                            <i class="fa-solid fa-paper-plane"></i> Submit Feedback
+                        </button>
+                    </div>
+                    <div id="feedback-submitted-msg" class="feedback-submitted" style="display:none;">
+                        <i class="fa-solid fa-circle-check"></i> Feedback recorded. Thank you.
+                    </div>
+                </div>
             </div>
         </div>
     </div>
+
+    <!-- Toast Notification -->
+    <div id="feedback-toast" class="feedback-toast hidden"></div>
 
     <script src="static/app.js"></script>
 </body>

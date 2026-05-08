@@ -11,11 +11,15 @@ from sqlalchemy import func
 from confluent_kafka import Consumer
 
 from database import get_db, engine, Base
-from models import Alert
+from models import Alert, Feedback
 from fastapi.responses import FileResponse
 
 # Initialize DB tables
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+    print("Database tables initialized successfully.")
+except Exception as e:
+    print(f"Warning: Could not initialize database tables. Ensure PostgreSQL is running. Error: {e}")
 
 app = FastAPI(title="SOCGUARD Backend API")
 
@@ -29,10 +33,14 @@ app.add_middleware(
 )
 
 # Static Files
-app.mount("/static", StaticFiles(directory="static"), name="static")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
 # Kafka Config
-KAFKA_BROKER = os.environ.get('KAFKA_BROKER', 'kafka:29092')
+# Default to localhost:9092 if KAFKA_BROKER is not set (e.g. running locally outside Docker)
+KAFKA_BROKER = os.environ.get('KAFKA_BROKER')
+if not KAFKA_BROKER:
+    KAFKA_BROKER = 'localhost:9092'
 KAFKA_TOPIC = 'processed_alerts'
 
 # WebSocket Connection Manager
@@ -97,15 +105,22 @@ async def startup_event():
 
 @app.get("/")
 async def read_root():
-    return FileResponse('static/index.html')
+    return FileResponse(os.path.join(BASE_DIR, 'static/index.html'))
 
 @app.get("/login")
 async def read_login():
-    return FileResponse('static/login.html')
+    return FileResponse(os.path.join(BASE_DIR, 'static/login.html'))
 
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+class FeedbackRequest(BaseModel):
+    alert_content_id: str
+    alert_category: str = ""
+    feedback_type: str          # 'confirm' | 'dispute'
+    dispute_reason: str = ""    # empty string when confirming
+    analyst_notes: str = ""
 
 @app.post("/api/login")
 async def login(request: LoginRequest):
@@ -115,10 +130,33 @@ async def login(request: LoginRequest):
     return {"status": "error", "message": "Invalid credentials"}
 
 # REST Endpoints
+def serialize_alert(a):
+    """Convert an Alert ORM object to a JSON-safe dict with all fields the frontend expects."""
+    is_image = (a.content_type == 'image') if a.content_type else False
+    return {
+        "id":             a.id,
+        "content_id":     a.content_id,
+        "timestamp":      a.timestamp.isoformat() if a.timestamp else None,
+        "platform":       a.platform,
+        "threat_category": a.threat_category,
+        "severity_score": a.severity_score,
+        "reasoning":      a.reasoning,
+        "content_type":   a.content_type,
+        "original_text":  a.original_text,
+        "author":         a.author,
+        "author_username": a.author,
+        "is_resolved":    a.is_resolved,
+        "audio_url":      a.audio_url,
+        "explanation_image": a.explanation_image,
+        # frontend checks alert.image_url first, then alert.original_url
+        "image_url":      a.original_url if is_image else None,
+        "original_url":   a.original_url,
+    }
+
 @app.get("/api/alerts")
 def get_alerts(skip: int = 0, limit: int = 50, db: Session = Depends(get_db)):
     alerts = db.query(Alert).order_by(Alert.timestamp.desc()).offset(skip).limit(limit).all()
-    return alerts
+    return [serialize_alert(a) for a in alerts]
 
 @app.get("/api/stats")
 def get_stats(db: Session = Depends(get_db)):
@@ -147,6 +185,59 @@ def clear_alerts(db: Session = Depends(get_db)):
         db.rollback()
         return {"status": "error", "message": str(e)}
 
+@app.post("/api/feedback", status_code=201)
+def submit_feedback(request: FeedbackRequest, db: Session = Depends(get_db)):
+    """Persist analyst feedback on a threat alert."""
+    # Validate feedback type
+    if request.feedback_type not in ('confirm', 'dispute'):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="feedback_type must be 'confirm' or 'dispute'")
+
+    if request.feedback_type == 'dispute' and not request.dispute_reason:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="dispute_reason is required when disputing")
+
+    entry = Feedback(
+        alert_content_id=request.alert_content_id,
+        alert_category=request.alert_category or None,
+        feedback_type=request.feedback_type,
+        dispute_reason=request.dispute_reason or None,
+        analyst_notes=request.analyst_notes or None,
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    print(f"[Feedback] Saved: id={entry.id} alert={entry.alert_content_id} type={entry.feedback_type}")
+    return {"status": "success", "feedback_id": entry.id}
+
+@app.get("/api/feedback")
+def get_feedback(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """Return all submitted analyst feedback entries."""
+    import datetime
+    rows = db.query(Feedback).order_by(Feedback.submitted_at.desc()).offset(skip).limit(limit).all()
+    return [
+        {
+            "id": r.id,
+            "alert_content_id": r.alert_content_id,
+            "alert_category": r.alert_category,
+            "feedback_type": r.feedback_type,
+            "dispute_reason": r.dispute_reason,
+            "analyst_notes": r.analyst_notes,
+            "submitted_at": r.submitted_at.isoformat() if r.submitted_at else None,
+        }
+        for r in rows
+    ]
+
+@app.get("/api/logs")
+def get_logs():
+    try:
+        with open("/app/../ingestion_logs_new.txt", "rb") as f:
+            content = f.read().decode("utf-16le", errors="replace")
+            return {"logs": content[-5000:]}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 # WebSocket Endpoint
 @app.websocket("/ws/live-threats")
 async def websocket_endpoint(websocket: WebSocket):
@@ -158,3 +249,8 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+
+if __name__ == "__main__":
+    import uvicorn
+    # Pass the app object directly so it works regardless of the current working directory
+    uvicorn.run(app, host="0.0.0.0", port=8000)

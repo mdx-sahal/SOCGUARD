@@ -91,7 +91,9 @@ def process_message(msg_value, session):
             threat_category=finalized_data.get('threat_category', 'unknown'),
             severity_score=finalized_data.get('severity_score', 0.0),
             reasoning=finalized_data.get('reasoning'),
-            original_url=finalized_data.get('original_url'),
+            # image_url from text-analysis alerts carries the base64 attachment;
+            # image-analysis alerts store the URL in original_url directly.
+            original_url=finalized_data.get('original_url') or finalized_data.get('image_url'),
             audio_url=finalized_data.get('audio_url'),
             content_type=finalized_data.get('content_type'),
             original_text=finalized_data.get('original_text'),

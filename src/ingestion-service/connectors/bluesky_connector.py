@@ -97,9 +97,9 @@ def start_bluesky_listener(callback):
                 
                 callback(event_data)
 
-            # Sleep
-            logger.info(f"Sleeping for 15 seconds...")
-            time.sleep(15)
+            # Sleep before next poll
+            logger.info(f"Sleeping for {POLL_INTERVAL} seconds...")
+            time.sleep(POLL_INTERVAL)
 
         except Exception as e:
             logger.error(f"Bluesky Polling Error: {e}")

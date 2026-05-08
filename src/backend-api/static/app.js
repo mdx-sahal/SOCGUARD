@@ -319,7 +319,7 @@ window.openModal = (alert) => {
 
     modalTimestamp.textContent = new Date(alert.timestamp).toLocaleString();
     modalPlatform.textContent = alert.platform;
-    modalAuthor.textContent = alert.author || 'Anonymous';
+    modalAuthor.textContent = alert.author || alert.author_username || 'Anonymous';
     modalSeverity.textContent = alert.severity_score.toFixed(1);
     modalSeverity.className = `score-badge ${getSeverityClass(alert.severity_score, alert.threat_category)}`;
 
@@ -335,7 +335,7 @@ window.openModal = (alert) => {
     const urlToShow = alert.image_url || alert.original_url;
 
     const isAudio = urlToShow && (urlToShow.match(/\.(mp3|wav|ogg|oga|m4a)$/i) || urlToShow.includes('voice') || urlToShow.includes('audio'));
-    const isImage = alert.content_type === 'image' || (urlToShow && (urlToShow.match(/\.(jpg|jpeg|png|gif|webp)$/i) || (urlToShow.includes('api.telegram.org/file') && !isAudio)));
+    const isImage = alert.content_type === 'image' || (urlToShow && (urlToShow.match(/\.(jpg|jpeg|png|gif|webp)$/i) || urlToShow.startsWith('data:image/') || (urlToShow.includes('api.telegram.org/file') && !isAudio)));
 
     if (isAudio) {
         contentHtml += `<div class="audio-preview"><audio controls src="${urlToShow}" style="width: 100%; margin-top: 10px;"></audio></div>`;
@@ -375,6 +375,17 @@ window.openModal = (alert) => {
     }
 
     modal.classList.remove('hidden');
+
+    // Reset feedback panel state
+    document.getElementById('feedback-submitted-msg').style.display = 'none';
+    document.getElementById('dispute-reason-panel').style.display = 'none';
+    document.getElementById('dispute-reason-select').value = '';
+    document.getElementById('dispute-notes').value = '';
+    document.getElementById('btn-confirm').classList.remove('active');
+    document.getElementById('btn-dispute').classList.remove('active');
+    // Store current alert id for feedback submission
+    modal.dataset.alertId = alert.content_id || alert.id || '';
+    modal.dataset.alertCategory = alert.threat_category || '';
 };
 
 closeModal.addEventListener('click', () => {
@@ -386,3 +397,99 @@ window.addEventListener('click', (e) => {
         modal.classList.add('hidden');
     }
 });
+
+// ── Analyst Feedback Logic ──
+window.submitFeedback = (type) => {
+    const confirmBtn = document.getElementById('btn-confirm');
+    const disputeBtn = document.getElementById('btn-dispute');
+    const disputePanel = document.getElementById('dispute-reason-panel');
+    const submittedMsg = document.getElementById('feedback-submitted-msg');
+
+    confirmBtn.classList.remove('active');
+    disputeBtn.classList.remove('active');
+    submittedMsg.style.display = 'none';
+
+    if (type === 'confirm') {
+        confirmBtn.classList.add('active');
+        disputePanel.style.display = 'none';
+
+        const alertId = modal.dataset.alertId;
+        const category = modal.dataset.alertCategory;
+
+        fetch(`${API_BASE}/feedback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                alert_content_id: alertId,
+                alert_category: category,
+                feedback_type: 'confirm',
+                dispute_reason: '',
+                analyst_notes: ''
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                submittedMsg.style.display = 'flex';
+                showToast('\u2705 Threat confirmed \u2014 flagging validated.');
+            } else {
+                showToast('\u26a0\ufe0f Could not save feedback.', 'warn');
+            }
+        })
+        .catch(() => showToast('\u26a0\ufe0f Network error saving feedback.', 'warn'));
+    } else {
+        disputeBtn.classList.add('active');
+        disputePanel.style.display = 'block';
+    }
+};
+
+window.submitDisputeReason = () => {
+    const reason = document.getElementById('dispute-reason-select').value;
+    const notes = document.getElementById('dispute-notes').value.trim();
+    const submittedMsg = document.getElementById('feedback-submitted-msg');
+    const disputePanel = document.getElementById('dispute-reason-panel');
+
+    if (!reason) {
+        showToast('\u26a0\ufe0f Please select a reason for disputing.', 'warn');
+        return;
+    }
+
+    const alertId = modal.dataset.alertId;
+    const category = modal.dataset.alertCategory;
+
+    fetch(`${API_BASE}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            alert_content_id: alertId,
+            alert_category: category,
+            feedback_type: 'dispute',
+            dispute_reason: reason,
+            analyst_notes: notes
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            disputePanel.style.display = 'none';
+            submittedMsg.style.display = 'flex';
+            showToast('\uD83D\uDDE8\uFE0F Dispute submitted \u2014 flagging marked for review.');
+        } else {
+            showToast('\u26a0\ufe0f Could not save feedback.', 'warn');
+        }
+    })
+    .catch(() => showToast('\u26a0\ufe0f Network error saving feedback.', 'warn'));
+};
+
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('feedback-toast');
+    toast.textContent = message;
+    toast.style.borderColor = type === 'warn' ? 'var(--accent-orange)' : 'var(--accent-green)';
+    toast.style.color = type === 'warn' ? 'var(--accent-orange)' : 'var(--accent-green)';
+    toast.classList.remove('hidden');
+    toast.classList.add('show');
+    setTimeout(() => {
+        toast.classList.remove('show');
+        toast.classList.add('hidden');
+    }, 3500);
+}

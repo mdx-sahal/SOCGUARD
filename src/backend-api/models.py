@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, Float, Text, Boolean
 from database import Base
+import datetime
 
 class Alert(Base):
     __tablename__ = 'alerts'
@@ -21,3 +22,18 @@ class Alert(Base):
 
     def __repr__(self):
         return f"<Alert(id={self.id}, content_id='{self.content_id}', category='{self.threat_category}', score={self.severity_score})>"
+
+
+class Feedback(Base):
+    __tablename__ = 'feedback'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    alert_content_id = Column(String, nullable=False, index=True)
+    alert_category = Column(String, nullable=True)
+    feedback_type = Column(String, nullable=False)        # 'confirm' | 'dispute'
+    dispute_reason = Column(String, nullable=True)         # null when confirming
+    analyst_notes = Column(Text, nullable=True)
+    submitted_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    def __repr__(self):
+        return f"<Feedback(id={self.id}, alert='{self.alert_content_id}', type='{self.feedback_type}')>"

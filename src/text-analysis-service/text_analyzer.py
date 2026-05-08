@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 KAFKA_BROKER = os.environ.get('KAFKA_BROKER', 'kafka:29092')
 INPUT_TOPIC  = 'social-media-feed'
 OUTPUT_TOPIC = 'processed_alerts'
-GROUP_ID     = 'text-analysis-group-v6'
+GROUP_ID     = 'text-analysis-group-v7'
 
 # ── Model state ──────────────────────────────────────────────────────────────
 classifier          = None
@@ -255,12 +255,17 @@ def main():
                 alert = {
                     "content_id":     f"{data.get('content_id')}_text",
                     "timestamp":      time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
-                    "original_text":  content,
+                    # Use display_content for storage (includes Subject: header for emails)
+                    # but NLP ran on clean 'content' only
+                    "original_text":  data.get('display_content') or content,
                     "platform":       platform,
+                    "content_type":   data.get('content_type', 'text'),
                     "threat_category": threat_label,
                     "severity_score": severity,
                     "reasoning":      reasoning,
                     "author_username": data.get('author_username'),
+                    # Forward image_url if present (e.g. email with image attachment + text threat)
+                    "image_url":      data.get('image_url'),
                 }
 
                 producer.produce(

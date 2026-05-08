@@ -4,7 +4,9 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 
 load_dotenv('.env')
 
-SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+# gmail.modify is a superset of gmail.readonly — allows reading AND
+# marking messages as read (required by the email_connector)
+SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
 
 CLIENT_ID = os.environ.get('EMAIL_CLIENT_ID', '').strip()
 CLIENT_SECRET = os.environ.get('EMAIL_CLIENT_SECRET', '').strip()
